@@ -1,0 +1,20 @@
+{
+  "name": "sea-poc",
+  "version": "1.0.0",
+  "description": "Node.js Single Executable Application (SEA) minimal PoC with bundled npm packages",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "bundle": "esbuild src/index.js --bundle --platform=node --target=node22 --outfile=dist/bundle.js",
+    "build": "./build.sh",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "dayjs": "^1.11.13",
+    "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "postject": "^1.0.0-alpha.6"
+  }
+}
