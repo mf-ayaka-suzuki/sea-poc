@@ -1,0 +1,19 @@
+<service>
+  <id>sea-svc</id>
+  <name>SEA Heartbeat Service (PoC)</name>
+  <description>SEA single-executable heartbeat service</description>
+
+  <!-- %BASE% は本XML(およびWinSW.exe)が置かれたフォルダ -->
+  <executable>%BASE%\sea-svc.exe</executable>
+
+  <env name="SEA_SVC_LOG" value="%BASE%\sea-svc.log"/>
+  <env name="SEA_SVC_INTERVAL_MS" value="5000"/>
+
+  <!-- 自動起動 = 再起動をまたいで動く -->
+  <startmode>Automatic</startmode>
+
+  <!-- 落ちたら再起動 -->
+  <onfailure action="restart" delay="2 sec"/>
+
+  <log mode="roll"/>
+</service>

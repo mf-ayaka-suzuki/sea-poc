@@ -1,0 +1,17 @@
+[Unit]
+Description=SEA heartbeat service (PoC)
+After=network.target
+
+[Service]
+Type=simple
+# バイナリの配置先に合わせて調整
+ExecStart=/opt/sea-svc/sea-svc
+Environment=SEA_SVC_LOG=/var/log/sea-svc.log
+Environment=SEA_SVC_INTERVAL_MS=5000
+# 落ちても自動再起動
+Restart=always
+RestartSec=2
+
+[Install]
+# enable すると起動時に自動開始 = 再起動をまたいで動く
+WantedBy=multi-user.target

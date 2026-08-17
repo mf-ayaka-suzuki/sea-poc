@@ -1,0 +1,7 @@
+{
+  "main": "dist/service.bundle.js",
+  "output": "dist/service.blob",
+  "disableExperimentalSEAWarning": true,
+  "useSnapshot": false,
+  "useCodeCache": false
+}
