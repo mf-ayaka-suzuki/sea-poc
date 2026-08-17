@@ -62,4 +62,36 @@
   再起動をまたぐ生存は **Linux=systemd（`enable`）/ Windows=WinSW等のラッパー（Automatic起動）** に任せる。
 - **根拠**: 再起動後の自動起動やスリープ復帰の面倒はOSのサービス管理の責務。SEAバイナリ自体は
   「単体で起動でき、シグナルに従う長寿命プロセス」であればよい。
+- **実測での裏付け（2026-08-17）**: 再起動＝プロセスは作り直される（新pid・新START行）、
+  スリープ＝**同一プロセスが眠って起きるだけ**（pid不変・START行なし）と、two通りの経路が
+  それぞれ期待どおり成立した。バイナリ側が意識すべきなのは前者（起動時の初期化）と
+  シグナル受信時の後片付けだけで、スリープは**何もしなくても素通りする**。
+- **ただし1点だけ実装側の責務**: スリープ中はタイマーが止まり復帰後もキャッチアップしない。
+  時間に依存する処理は実時計で判断すること（→[pitfalls P8](pitfalls.md)）。
 - **Windows特記**: 生exeはSCM非対応のため `sc create` 直指定では正しく起動しない → ラッパー必須（→[pitfalls P5](pitfalls.md)）。
+  2026-08-17 に実機で `StartService FAILED 1053` を再現し、この判断が正しいことを実測で確認した。
+
+## D9. Windowsでもホスト単体でビルドできる（`build-win.ps1`）
+
+- **背景**: D7 は「Macから各OS向けを作る」設計だが、Windows実機しか無い場合にMacを介するのは無駄。
+- **決定**: Windowsネイティブのビルド経路 `build-win.ps1` を用意し、**Macなし・node未インストールのまま**
+  bundle → blob → 注入 まで完結させる。土台nodeもツール実行用nodeも `vendor/` の同一公式バイナリを使う。
+- **根拠**: SEAのblobはプラットフォーム非依存（D7）で、esbuild/postjectもnodeさえあれば動く。
+  2026-08-17 の実測で、Mac経由のクロスビルド成果物と**同サイズ（約83MB）・同挙動**の
+  `sea-svc.exe` が Windows 単体で得られることを確認した（→[検証記録](verifications/2026-08-17-windows-service-real.md)）。
+- **補足**: `vendor/` に置くだけでシステムにnodeを入れないため、D2の「既存環境を汚さない」方針と整合する。
+
+## D10. Windowsのサービスラッパー → WinSW v2.12.0（安定版）
+
+- **背景**: D8のとおりラッパーは必須。WinSW / NSSM のどちらを既定にするか。
+- **決定**: **WinSW v2.12.0**（`WinSW-x64.exe`, 約17.4MB）を既定とする。v3系はまだ alpha のため採用しない。
+- **根拠**:
+  - 設定がXML1枚で完結し、リポジトリに commit できる（`deploy/windows/sea-svc.xml`）。NSSMはレジストリに
+    設定が散るため再現性が落ちる。
+  - `<startmode>Automatic</startmode>` と `<onfailure action="restart"/>` が SCM の
+    `START_TYPE: AUTO_START` / `FAILURE_ACTIONS: RESTART` にそのまま反映されることを実測。
+  - 停止時に子プロセスへ Ctrl+C を送るため、`src/service.js` の **SIGINTハンドラがそのまま効く**
+    （Unix系と同じ後片付けコードで両OSをカバーできる）。これは `Stop-Service` だけでなく
+    **OSシャットダウン時にも成立する**ことを 2026-08-17 の再起動テストで確認した。
+  - 再起動後は OS起動から約25秒、**ユーザーのログオンを待たずに** LocalSystem で起動する。
+- **注意**: WinSWは「**自分と同名の .xml**」を設定として読む。exe と xml のリネームは必ずセットで行う。

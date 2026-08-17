@@ -1,6 +1,12 @@
 # Windows(x64) でサービスとして動かす
 
-前提: `dist/win-x64/sea-svc.exe`（クロスビルド済み）を対象Windowsへ転送しておく。
+前提: `dist/win-x64/sea-svc.exe` を対象Windowsへ用意しておく。
+Mac からのクロスビルド（`build-cross.sh`）でも、Windows実機でのネイティブビルド（`build-win.ps1`,
+→[runbook-windows](../../docs/runbook-windows.md)）でも同じ成果物が得られる。
+
+> **実機検証済み（2026-08-17）**: 本手順の方法A（WinSW v2.12.0）で Windows 11 x64 上での
+> 登録・起動・停止・異常終了からの自動復帰まで確認した。詳細は
+> [検証記録](../../docs/verifications/2026-08-17-windows-service-real.md)。
 
 ## 重要: 生のexeは直接サービスにできない
 
