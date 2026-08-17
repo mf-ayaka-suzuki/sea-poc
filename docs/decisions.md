@@ -95,3 +95,20 @@
     **OSシャットダウン時にも成立する**ことを 2026-08-17 の再起動テストで確認した。
   - 再起動後は OS起動から約25秒、**ユーザーのログオンを待たずに** LocalSystem で起動する。
 - **注意**: WinSWは「**自分と同名の .xml**」を設定として読む。exe と xml のリネームは必ずセットで行う。
+
+## D11. Linux の再起動/サスペンド検証は Docker/systemdコンテナで代用（バーメタルは未実施）
+
+- **背景**: Linux の「systemd登録→再起動で自動起動」「サスペンド生存」を検証したい。最も確実なのは
+  物理Linux機（またはフルVM）を `sudo reboot` / `systemctl suspend` すること。
+- **決定**: **バーメタル/フルVMは立てず、Mac の Docker で代用**する。
+  - 再起動 → **systemdコンテナ + `docker restart`**（`systemctl enable` → systemd を boot し直す）。
+  - サスペンド → **`docker pause`**、および mac実機スリープ時に Docker Linux VM ごと実サスペンドされた実測。
+- **根拠**:
+  - このセッションはMac上で動作し、**接続された空きの物理Linux機が無い**。
+  - **Dockerコンテナはカーネル共有**のため、コンテナ内から本物のカーネル再起動は不可
+    （`systemctl reboot` はコンテナ停止になるだけ）。実機rebootは原理的にDockerでは不可。
+  - フルVM(multipass/lima)は実ゲストreboot可能だが、ソフト導入・VM作成コストを避ける判断（ユーザー合意）。
+- **線引き（未実測として明記）**: 物理電源断・BIOS/カーネル起動・デバイス再初期化・フルブート時の
+  systemd起動順序は未検証。**サービス管理の経路（enable→boot→自動起動）は実証済み**だが、
+  カーネル/ハードウェア込みの再起動は未実証。詰めるなら物理Linux機かフルVMで実施する
+  （→[検証記録](verifications/2026-08-17-linux-systemd-reboot.md)）。

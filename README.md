@@ -15,14 +15,14 @@ Node.js の **SEA (Single Executable Applications)** の実用性を検証した
 | SEA単一バイナリ生成（node不要で起動） | ✅ 実機 arm64 | ✅ VM ELF | ✅ 実機 PE(exe) |
 | npmパッケージ封入が動作（lodash/dayjs） | ✅ 実機 | ✅ VM | ✅ 実機 |
 | 常駐サービスとして動作 | ✅ 実機ネイティブ/VM | ✅ VM | ✅ 実機 WinSW |
-| OS再起動をまたぐ自動起動 | ✅ 実機 Mac再起動→Docker復帰 | 手順のみ systemd（Docker復帰はVMで実測: STOP→START） | ✅ 実機 再起動後25秒で自動起動 |
+| OS再起動をまたぐ自動起動 | ✅ 実機 Mac再起動→Docker復帰 | ✅ VM systemd登録→boot自動起動を実測（バーメタルrebootは未） | ✅ 実機 再起動後25秒で自動起動 |
 | 異常終了からの自動復帰 | ✅ VM `--restart always` | ✅ VM 同左 | ✅ 実機 WinSW `onfailure`（約6秒で復帰） |
 | グレースフル停止（SIGTERM/SIGINT） | ✅ 実機 `STOP`記録 | ✅ VM | ✅ 実機 Ctrl+C→SIGINT（OS停止時も） |
 | スリープ復帰後の生存 | ✅ 実機スリープ ~126s | ✅ 実host suspend ~122s（VM・同一pid・連番+1）＋`docker pause` | ✅ 実機 S0スタンバイ ~148s |
 
 - **結論**: SEA単一バイナリは、3プラットフォームとも**OSのサービス管理下で「再起動をまたいで自動復帰する常駐サービス」として実用に足る**。スリープは3OSとも「同一プロセスが凍って復帰・再起動ではない」を実測で確認。
 - 「再起動しても動く」の主体は**バイナリではなくOSのサービス管理**（Linux=systemd / Windows=SCM+WinSW / macOS=Docker `--restart`）。バイナリ側は行儀の良い常駐プロセスに徹する設計。
-- **正直な線引き**: Linux は **Docker Desktop の Linux VM（仮想化された実Linuxカーネル）まで実測**。**バーメタルLinuxの `systemctl` による再起動/サスペンドは未実施（手順のみ）**。完全に詰めるなら実Linux機かフルVMが要る。
+- **正直な線引き**: Linux は **Docker Desktop の Linux VM（仮想化された実Linuxカーネル）まで実測**。再起動は **systemd登録→boot自動起動を実測**（systemdコンテナ）。**残る未実測はバーメタルのカーネル/ハードウェア込み reboot と mac の launchd 登録のみ**。サービス管理の経路自体は Windows(SCM) と Linux(systemd) の両方で実証済み。
 - 実機検証の全ログ・タイムラインは各 [検証記録](docs/index.md#検証ごとの記録増えていく) を参照。
 
 ## 実際にやった検証（証拠つき）
@@ -54,6 +54,11 @@ node 未インストールの実機で `build-win.ps1` により **Macなしで�
 mac は実機を約126秒スリープ、Linux は `docker pause` に加え、**mac実機スリープ時に Docker の Linux VM も実サスペンド**
 された痕跡（別コンテナ `seademo` が `#7463 → #7464`、約122秒の空白）を取得。3OSとも共通の挙動：
 **同一pidのまま凍って復帰・再起動ではない・`setInterval`は止まってキャッチアップしない**（時間は実時計で進む）。
+
+**6. Linux も systemd 登録 → 再起動で自動起動**（systemdコンテナ / [記録](docs/verifications/2026-08-17-linux-systemd-reboot.md)）
+systemd が動くコンテナで `systemctl enable` → **`docker restart`（systemd を boot し直す）**。
+`systemctl start` を打たずに、再起動後 systemd が enabled ユニットを自動起動（新しい Main PID・新しい `START`・
+journal の `Started`）。これで「サービス登録→再起動で自動起動」を **Windows(SCM) と Linux(systemd) の両方で実測**。
 
 ## 中身は2種類のバイナリ
 
