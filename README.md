@@ -8,19 +8,52 @@ Node.js の **SEA (Single Executable Applications)** の実用性を検証した
 
 ## 結果サマリ
 
+各セルは**実際に観測した証拠**つき。「実機」=物理ハードで実測 / 「VM」=Mac上のDocker Desktop Linux VMで実測（仮想化された実Linuxカーネル）/ 「手順のみ」=定義・手順のみ（未実測）。
+
 | 確認項目 | macOS | Linux(x64) | Windows(x64) |
 |---|---|---|---|
-| SEA単一バイナリ生成（node不要で起動） | ✅ arm64 | ✅ | ✅ |
-| npmパッケージ封入が動作（lodash/dayjs） | ✅ | ✅ | ✅ |
-| 常駐サービスとして動作 | ✅ (Docker) | ✅ (Docker) | ✅ (WinSW実機) |
-| OS再起動をまたぐ自動起動 | ✅ (Mac実機/Docker) | ⏳ systemd手順のみ | ✅ 実機 |
-| 異常終了からの自動復帰 | ✅ (`--restart always`) | ✅ (同左) | ✅ (WinSW `onfailure`) |
-| グレースフル停止（SIGTERM/SIGINT） | ✅ | ✅ | ✅ (Ctrl+C→SIGINT) |
-| スリープ復帰後の生存 | ⏳ 未 | ⏳ 未 | ✅ (S0 Modern Standby) |
+| SEA単一バイナリ生成（node不要で起動） | ✅ 実機 arm64 | ✅ VM ELF | ✅ 実機 PE(exe) |
+| npmパッケージ封入が動作（lodash/dayjs） | ✅ 実機 | ✅ VM | ✅ 実機 |
+| 常駐サービスとして動作 | ✅ 実機ネイティブ/VM | ✅ VM | ✅ 実機 WinSW |
+| OS再起動をまたぐ自動起動 | ✅ 実機 Mac再起動→Docker復帰 | 手順のみ systemd（Docker復帰はVMで実測: STOP→START） | ✅ 実機 再起動後25秒で自動起動 |
+| 異常終了からの自動復帰 | ✅ VM `--restart always` | ✅ VM 同左 | ✅ 実機 WinSW `onfailure`（約6秒で復帰） |
+| グレースフル停止（SIGTERM/SIGINT） | ✅ 実機 `STOP`記録 | ✅ VM | ✅ 実機 Ctrl+C→SIGINT（OS停止時も） |
+| スリープ復帰後の生存 | ✅ 実機スリープ ~126s | ✅ 実host suspend ~122s（VM・同一pid・連番+1）＋`docker pause` | ✅ 実機 S0スタンバイ ~148s |
 
-- **結論**: SEA単一バイナリは、3プラットフォームとも**OSのサービス管理下で「再起動をまたいで自動復帰する常駐サービス」として実用に足る**。
+- **結論**: SEA単一バイナリは、3プラットフォームとも**OSのサービス管理下で「再起動をまたいで自動復帰する常駐サービス」として実用に足る**。スリープは3OSとも「同一プロセスが凍って復帰・再起動ではない」を実測で確認。
 - 「再起動しても動く」の主体は**バイナリではなくOSのサービス管理**（Linux=systemd / Windows=SCM+WinSW / macOS=Docker `--restart`）。バイナリ側は行儀の良い常駐プロセスに徹する設計。
+- **正直な線引き**: Linux は **Docker Desktop の Linux VM（仮想化された実Linuxカーネル）まで実測**。**バーメタルLinuxの `systemctl` による再起動/サスペンドは未実施（手順のみ）**。完全に詰めるなら実Linux機かフルVMが要る。
 - 実機検証の全ログ・タイムラインは各 [検証記録](docs/index.md#検証ごとの記録増えていく) を参照。
+
+## 実際にやった検証（証拠つき）
+
+時系列で、何を叩いて何が観測できたか。詳細ログは各リンク先に。
+
+**1. 最小SEAバイナリが単体で動く**（mac / [記録](docs/verifications/2026-08-14-initial.md)）
+`dist/sea-poc` を実行すると `running inside SEA: true` と出て、封入した lodash(`_.chunk`)・dayjs の結果が表示。
+node 未インストールのディレクトリへコピーしても同一出力 → **node非依存で単体完結**を確認。
+
+**2. Linux/Windows へクロスビルドできる**（Mac→x64 / [記録](docs/verifications/2026-08-14-service-win-linux.md)）
+blob はプラットフォーム非依存なので、土台nodeを公式の linux-x64 / win-x64 に差し替えて注入。
+Mac から `ELF x86-64`（119MB）と `PE32+ console x86-64`（83MB）を生成。Linux版は **Mac の Docker** で実行し、
+`sea=true` / `platform=linux/x64` とハートビートを確認。停止→再起動でログが追記継続することも確認。
+
+**3. Mac再起動をまたいで自動復帰**（mac実機 / [記録](docs/verifications/2026-08-17-mac-reboot-survival.md)）
+`--restart always` のコンテナを常駐させ、Macを実際に再起動。ログに
+`STOP (SIGTERM)`（シャットダウン時のグレースフル停止）→ 約2分半の空白 → 新しい `START`（自動復帰）が残った。
+
+**4. Windows実機でサービスとして本格動作**（Windows 11 / [記録](docs/verifications/2026-08-17-windows-service-real.md)）
+node 未インストールの実機で `build-win.ps1` により **Macなしでネイティブビルド**（同サイズ83MB）。WinSW でサービス登録し、
+以下をすべて実測：
+  - 生exeを `sc create` 直指定 → 起動で `1053` 失敗（**ラッパー必須**の裏取り）
+  - SCMからの停止/起動、異常終了からの自動復帰（約6秒）
+  - **OS再起動をまたぐ自動起動**（起動後25秒・ログオン前に開始、heartbeat `#1`〜`#541` 欠番なし）
+  - グレースフル停止が **OSシャットダウン時にも**機能（Ctrl+C→SIGINT）
+
+**5. スリープ（suspend/resume）をまたいで生存**（mac / Linux / [記録](docs/verifications/2026-08-17-mac-linux-sleep.md)）
+mac は実機を約126秒スリープ、Linux は `docker pause` に加え、**mac実機スリープ時に Docker の Linux VM も実サスペンド**
+された痕跡（別コンテナ `seademo` が `#7463 → #7464`、約122秒の空白）を取得。3OSとも共通の挙動：
+**同一pidのまま凍って復帰・再起動ではない・`setInterval`は止まってキャッチアップしない**（時間は実時計で進む）。
 
 ## 中身は2種類のバイナリ
 

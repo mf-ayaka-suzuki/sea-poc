@@ -11,7 +11,7 @@
 | P5 | Windowsで `sc create` 直指定したサービスが `StartService FAILED 1053`（起動要求に応答しない）で失敗 | 生exeはSCM制御に応答しない（サービスアウェアでない）。**登録自体は成功するので気づきにくい** | WinSW / NSSM 等の**ラッパー**でサービス化（→[deploy/windows](../deploy/windows/README.md)）。2026-08-17に実機で再現確認済 |
 | P6 | 日本語コメント入りの `.ps1` が `Unexpected token` / `The string is missing the terminator` で落ちる | Windows PowerShell 5.1 は **BOM無しの .ps1 をANSIとして読む**ため、UTF-8の日本語が文字化けしてクォートが壊れる | `.ps1` は **UTF-8 BOM付き**で保存する（→下記コマンド） |
 | P7 | WinSW の `install` / `start` が権限エラーになる、または `Get-Service` はあるのに操作できない | サービス登録・操作には管理者権限が必要。Administratorsグループ所属でもUACで**フィルタ済みトークン**になっている | 管理者PowerShellで実行（`Start-Process powershell -Verb RunAs`）。`whoami /groups` で `BUILTIN\Administrators` が `Group used for deny only` なら未昇格 |
-| P8 | スリープをまたぐと「定期処理の実行回数」が実経過時間と合わない（例: 5秒間隔なのに148秒の空白で1回しか進まない） | **スリープ中は `setInterval` が停止**し、復帰後もまとめ発火（キャッチアップ）しない。プロセスは生きたままなので気づきにくい | 時間に依存する判断は必ず**実時計**（`Date` / `process.uptime()`）で行う。発火回数を時間の代用にしない。2026-08-17にS0スタンバイで実測 |
+| P8 | スリープをまたぐと「定期処理の実行回数」が実経過時間と合わない（例: 5秒間隔なのに148秒の空白で1回しか進まない） | **スリープ中は `setInterval` が停止**し、復帰後もまとめ発火（キャッチアップ）しない。プロセスは生きたままなので気づきにくい | 時間に依存する判断は必ず**実時計**（`Date` / `process.uptime()`）で行う。発火回数を時間の代用にしない。2026-08-17に Windows(S0)/Linux(freeze)/mac実機 の3プラットフォームで実測 |
 
 ## 確認コマンド
 

@@ -27,6 +27,7 @@ Node.js SEA 技術検証のドキュメント。**変わらない知識**と**�
 | 2026-08-14 | [Win/Linuxのサービス動作（x64）](verifications/2026-08-14-service-win-linux.md)                     | Linux✅ / Win⏳(手順)                   |
 | 2026-08-17 | [Windows実機でのサービス動作（ネイティブビルド）](verifications/2026-08-17-windows-service-real.md) | ✅ 成功（再起動・スリープまたぎも実測） |
 | 2026-08-17 | [Mac実機の再起動をまたぐ自動復帰](verifications/2026-08-17-mac-reboot-survival.md)                  | ✅ 成功                                 |
+| 2026-08-17 | [mac/Linux スリープをまたぐ生存](verifications/2026-08-17-mac-linux-sleep.md)                        | ✅ 成功                                 |
 
 ## その他
 
